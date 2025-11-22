@@ -1,0 +1,15 @@
+{
+  "name": "beatbox-server",
+  "version": "1.0.0",
+  "description": "Node.js server for ENSC 351 BeatBox",
+  "main": "server.js",
+  "scripts": {
+    "start:node_server": "node server.js",
+    "start:c_app": "cd ../build && ./app/beatbox",
+    "start": "concurrently \"npm:start:node_server\" \"npm:start:c_app\""
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2"
+  }
+}
