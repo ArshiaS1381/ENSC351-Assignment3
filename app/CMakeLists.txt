@@ -1,17 +1,12 @@
-# Create the final executable
-add_executable(beatbox beatbox.c)
-
-# Link the "beatbox" executable against our two libraries.
-# The pthread flags are inherited from the root.
-target_link_libraries(beatbox PRIVATE
-    beatbox_lib
-    # controls_lib
+# Sources for the main application
+set(APP_SOURCES
+    beatbox.c
 )
 
-# --- Deployment Rule ---
+# Create the executable named 'beatbox'
+add_executable(beatbox ${APP_SOURCES})
 
-# Install the "beatbox" executable to the destination
-# required by the assignment.
-install(TARGETS beatbox
-    DESTINATION ${CMAKE_INSTALL_PREFIX}/public/myApps
+# Link the executable to the static library, using the new name beatbox_lib. 
+target_link_libraries(beatbox PRIVATE
+    beatbox_lib 
 )
