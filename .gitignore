@@ -2,13 +2,8 @@
 CMakeCache.txt
 cmake_install.cmake
 Makefile
-*.o
-*.a
-*.exe
-*.dll
-*.secret
 build/
-assets/
+# assets/
 
 # Node dependencies (specific path required)
 as3-server/node_modules/
