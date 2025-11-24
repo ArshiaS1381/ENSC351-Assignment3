@@ -15,6 +15,10 @@
 static snd_pcm_t *handle;
 static bool s_audioInitialized = false; 
 
+<<<<<<< HEAD
+=======
+#define AUDIO_DEVICE "plughw:1,0"
+>>>>>>> new_feature_branch
 #define DEFAULT_VOLUME 80
 #define SAMPLE_RATE 44100
 #define NUM_CHANNELS 1
@@ -44,7 +48,11 @@ void AudioMixer_init(void)
 		soundBites[i].pSound = NULL;
 	}
 
+<<<<<<< HEAD
 	int err = snd_pcm_open(&handle, "default", SND_PCM_STREAM_PLAYBACK, 0);
+=======
+	int err = snd_pcm_open(&handle, AUDIO_DEVICE, SND_PCM_STREAM_PLAYBACK, 0);
+>>>>>>> new_feature_branch
 	if (err < 0) {
 		printf("AudioMixer: Playback open error: %s\n", snd_strerror(err));
         printf("AudioMixer: WARNING: Proceeding in SILENT mode (no audio output).\n");

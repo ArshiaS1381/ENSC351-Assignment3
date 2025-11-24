@@ -73,8 +73,11 @@ void Accelerometer_poll(void) {
     s_lastX = x;
     s_lastY = y;
     s_lastZ = z;
+<<<<<<< HEAD
 }
 
 int Accelerometer_readZ(void) {
     return readAccelChannel(ACCEL_Z_CHANNEL);
+=======
+>>>>>>> new_feature_branch
 }

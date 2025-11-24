@@ -14,4 +14,25 @@ set(LIBRARY_OUTPUT_PATH ${CMAKE_SOURCE_DIR}/build/lib)
 
 # Add subdirectories to the build system
 add_subdirectory(lib_beatbox)
+<<<<<<< HEAD
 add_subdirectory(app)
+=======
+add_subdirectory(app)
+
+# --- Assignment 3 Compliance Deployment ---
+
+# 1. Set the install folder to the specific path required by the PDF
+# We use $ENV{HOME} to get the user's home directory (e.g., /home/phillip)
+set(CMAKE_INSTALL_PREFIX $ENV{HOME}/ensc351/public/myApps)
+
+# 2. Install the Executable (Requirement: deploy to ~/ensc351/public/myApps/)
+install(TARGETS beatbox DESTINATION .)
+
+# 3. Install Audio Files (Requirement: deploy to .../beatbox-wav-files/)
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/assets/wave-files/ 
+        DESTINATION beatbox-wav-files)
+
+# 4. Install Node Server (Requirement: deploy to .../beatbox-server-copy/)
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/as3-server/ 
+        DESTINATION beatbox-server-copy)
+>>>>>>> new_feature_branch

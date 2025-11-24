@@ -31,6 +31,7 @@ static void send_reply(const char *s, struct sockaddr_in *cli, socklen_t clen) {
 static void handle_command(char* cmd, struct sockaddr_in *cli, socklen_t clen) {
     char reply[MAX_LINE] = "";
     
+<<<<<<< HEAD
     // --- VOLUME (GET: "volume undefined", SET: "volume 80") ---
     if (strncmp(cmd, "volume", 6) == 0) {
         int newVol;
@@ -77,14 +78,64 @@ static void handle_command(char* cmd, struct sockaddr_in *cli, socklen_t clen) {
         if (sscanf(cmd, "play %d", &soundId) == 1) {
             // play 0=base, 1=hi-hat, 2=snare (based on beatbox_ui.js)
             switch(soundId) {
+=======
+    // --- VOLUME ---
+    if (strncmp(cmd, "volume", 6) == 0) {
+        int newVol;
+        // Attempt to parse a value. If successful (returns 1), it's a SET.
+        if (sscanf(cmd, "volume %d", &newVol) == 1) {
+            AudioMixer_setVolume(newVol);
+            InputMan_notifyManualVolumeSet();
+            sprintf(reply, "%d", AudioMixer_getVolume());
+        } 
+        // If sscanf fails, treat it as a GET (regardless of "undefined" string)
+        else {
+            sprintf(reply, "%d", AudioMixer_getVolume());
+        }
+    }
+    // --- TEMPO ---
+    else if (strncmp(cmd, "tempo", 5) == 0) {
+        int newTempo;
+        if (sscanf(cmd, "tempo %d", &newTempo) == 1) {
+            BeatGenerator_setTempo(newTempo);
+            sprintf(reply, "%d", BeatGenerator_getTempo());
+        }
+        else {
+            sprintf(reply, "%d", BeatGenerator_getTempo());
+        }
+    }
+    // --- MODE ---
+    else if (strncmp(cmd, "mode", 4) == 0) {
+        int newMode;
+        if (sscanf(cmd, "mode %d", &newMode) == 1) {
+            BeatGenerator_setMode((BeatMode)newMode);
+            sprintf(reply, "%d", newMode);
+        }
+        else {
+            sprintf(reply, "%d", BeatGenerator_getMode());
+        }
+    }
+    // --- PLAY ---
+    else if (strncmp(cmd, "play", 4) == 0) {
+        // ... (Keep your existing play logic) ...
+        int soundId;
+        if (sscanf(cmd, "play %d", &soundId) == 1) {
+             switch(soundId) {
+>>>>>>> new_feature_branch
                 case 0: AudioMixer_queueSound(s_pBaseSound); break;
                 case 1: AudioMixer_queueSound(s_pHiHatSound); break;
                 case 2: AudioMixer_queueSound(s_pSnareSound); break;
             }
         }
+<<<<<<< HEAD
         sprintf(reply, "1"); 
     }
     // --- STOP (SET: "stop") ---
+=======
+        sprintf(reply, "1");
+    }
+    // --- STOP ---
+>>>>>>> new_feature_branch
     else if (strncmp(cmd, "stop", 4) == 0) {
         s_wantQuit = true;
         sprintf(reply, "Stopping");

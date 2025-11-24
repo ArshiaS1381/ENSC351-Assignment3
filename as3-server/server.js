@@ -8,7 +8,11 @@
 //   $ node server.js
 // 
 
+<<<<<<< HEAD
 var PORT_NUMBER = 8089;
+=======
+var PORT_NUMBER = 8088;
+>>>>>>> new_feature_branch
 
 var http = require('http');
 var fs   = require('fs');

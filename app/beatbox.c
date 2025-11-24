@@ -11,9 +11,15 @@
 
 // Correct paths for the wave files (relative to the application execution location)
 // NOTE: These paths must match where your Node.js server copies the files!
+<<<<<<< HEAD
 #define BASE_SOUND   "../assets/wave-files/100051__menegass__gui-drum-bd-hard.wav"
 #define SNARE_SOUND  "../assets/wave-files/100059__menegass__gui-drum-snare-soft.wav"
 #define HIHAT_SOUND  "../assets/wave-files/100053__menegass__gui-drum-cc.wav"
+=======
+#define BASE_SOUND  "beatbox-wav-files/100051__menegass__gui-drum-bd-hard.wav"
+#define SNARE_SOUND "beatbox-wav-files/100059__menegass__gui-drum-snare-soft.wav"
+#define HIHAT_SOUND "beatbox-wav-files/100053__menegass__gui-drum-cc.wav"
+>>>>>>> new_feature_branch
 
 int main(void)
 {

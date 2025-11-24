@@ -9,7 +9,10 @@ void Accelerometer_cleanup(void);
 // Polls the three axes, checks for shake events, and queues sounds
 void Accelerometer_poll(void);
 
+<<<<<<< HEAD
 // Returns the raw ADC reading for the Z-axis (for completeness/debugging)
 int Accelerometer_readZ(void);
 
+=======
+>>>>>>> new_feature_branch
 #endif

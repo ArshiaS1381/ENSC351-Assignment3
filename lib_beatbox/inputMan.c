@@ -16,9 +16,20 @@
 // --- Configuration ---
 #define DEBOUNCE_SECS 2 // Lockout period after UDP volume set
 #define POLL_PERIOD_MS 10 // For Accel/Joystick polling (100Hz)
+<<<<<<< HEAD
 #define JOYSTICK_DEBOUNCE_POLLS 10 // For joystick press/hold debounce (~100ms)
 #define VOLUME_STEP 5 
 
+=======
+#define JOYSTICK_DEBOUNCE_POLLS 25 // For joystick press/hold debounce (~100ms)
+#define VOLUME_STEP 5 
+
+// Accelerometer on ADC channels 2, 3, 4
+#define ACCEL_X_CHANNEL 2 
+#define ACCEL_Y_CHANNEL 3 
+#define ACCEL_Z_CHANNEL 4 
+
+>>>>>>> new_feature_branch
 // --- Internal Global State ---
 static pthread_t s_inputThreadId;
 static volatile bool s_stopping = false;
@@ -158,6 +169,15 @@ static void* inputThread(void* _arg) {
             lastPrintTime = time(NULL);
         }
 
+<<<<<<< HEAD
+=======
+        // DEBUG : print Accelerometer ADC values 
+            // int x = mpc3208_read_channel(ACCEL_X_CHANNEL);
+            // int y = mpc3208_read_channel(ACCEL_Y_CHANNEL);
+            // int z = mpc3208_read_channel(ACCEL_Z_CHANNEL);
+            // printf("x:%d y:%d z:%d", x,y,z);
+
+>>>>>>> new_feature_branch
         // 4. Sleep/Poll Delay
         usleep(POLL_PERIOD_MS * 1000); 
     }
