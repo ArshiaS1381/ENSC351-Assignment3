@@ -3,11 +3,6 @@ CMakeCache.txt
 cmake_install.cmake
 Makefile
 build/
-# assets/
-
-# Node dependencies (specific path required)
-as3-server/node_modules/
-beatbox-server/node_modules/
 
 # IDE files
 /.vscode/
