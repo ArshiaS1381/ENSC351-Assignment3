@@ -3,16 +3,15 @@
 
 #include "audioMixer.h"
 
+// Initializes the accelerometer module and stores pointers to the drum sounds
 void Accelerometer_init(wavedata_t* pBase, wavedata_t* pSnare, wavedata_t* pHiHat);
+
+// Cleans up any resources (if necessary)
 void Accelerometer_cleanup(void);
 
-// Polls the three axes, checks for shake events, and queues sounds
+// Main worker function.
+// Should be called periodically (e.g., every 10ms) from the input thread.
+// Reads the hardware, detects motion, and queues audio events.
 void Accelerometer_poll(void);
 
-<<<<<<< HEAD
-// Returns the raw ADC reading for the Z-axis (for completeness/debugging)
-int Accelerometer_readZ(void);
-
-=======
->>>>>>> new_feature_branch
 #endif

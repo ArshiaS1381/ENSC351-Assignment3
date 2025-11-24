@@ -1,3 +1,15 @@
+/*
+ * Input Manager Module
+ * * This module centralizes input handling. It runs a dedicated thread that
+ * polls hardware inputs (Joystick, Accelerometer) at a fixed rate (e.g. 100Hz).
+ * * Responsibilities:
+ * 1. Initialize low-level drivers (ADC, Timer, Rotary, Joystick).
+ * 2. Poll the accelerometer for air-drumming events.
+ * 3. Poll the joystick for volume control.
+ * 4. Enforce debounce logic (preventing volume changes immediately after a remote update).
+ * 5. Print system statistics to the console once per second.
+ */
+
 #include "inputMan.h"
 #include "audioMixer.h"
 #include "accelerometer.h"
@@ -11,51 +23,46 @@
 #include <stdbool.h>
 #include <pthread.h>
 #include <time.h>
-#include <unistd.h> // for usleep()
+#include <unistd.h> 
 
-// --- Configuration ---
-#define DEBOUNCE_SECS 2 // Lockout period after UDP volume set
-#define POLL_PERIOD_MS 10 // For Accel/Joystick polling (100Hz)
-<<<<<<< HEAD
-#define JOYSTICK_DEBOUNCE_POLLS 10 // For joystick press/hold debounce (~100ms)
-#define VOLUME_STEP 5 
+// --- Configuration Constants ---
 
-=======
-#define JOYSTICK_DEBOUNCE_POLLS 25 // For joystick press/hold debounce (~100ms)
-#define VOLUME_STEP 5 
+#define LOCKOUT_DURATION_SEC 2   // How long to ignore joystick after web/UDP volume change
+#define POLL_RATE_MS 10          // Polling period (10ms = 100Hz)
+#define JOYSTICK_DEBOUNCE_CYCLES 25 // Hold-down delay for joystick volume
+#define VOLUME_INCREMENT 5       // Step size for joystick volume change
 
-// Accelerometer on ADC channels 2, 3, 4
-#define ACCEL_X_CHANNEL 2 
-#define ACCEL_Y_CHANNEL 3 
-#define ACCEL_Z_CHANNEL 4 
+// --- Internal State ---
 
->>>>>>> new_feature_branch
-// --- Internal Global State ---
 static pthread_t s_inputThreadId;
 static volatile bool s_stopping = false;
 static pthread_mutex_t s_mutex = PTHREAD_MUTEX_INITIALIZER;
-static time_t s_lastManualVolumeSet = 0; 
+
+static time_t s_lastManualVolumeSet = 0; // Timestamp of last remote volume change
 static int s_joystickDebounceCounter = 0; 
 
-// --- Private Function Prototypes ---
+// --- Private Helpers ---
 static void* inputThread(void* _arg);
 static void printStats(void);
 static void handleJoystick(void);
 
 
-// --- Public Functions ---
+// --- Public API ---
 
 void InputMan_init(wavedata_t* pBase, wavedata_t* pSnare, wavedata_t* pHiHat) {
     
-    // Initialize shared/low-level modules
+    // 1. Initialize hardware drivers
+    // IMPORTANT: mpc3208 must be init before Accelerometer/Joystick try to read it.
     mpc3208_init(); 
     Interval_init();
 
-    // Initialize individual input modules
+    // 2. Initialize the specific input sub-modules
+    // Accelerometer will read initial state here, so SPI must be ready.
     Accelerometer_init(pBase, pSnare, pHiHat);
     Joystick_init();
     Rotary_init(); 
 
+    // 3. Initialize state and start thread
     s_lastManualVolumeSet = time(NULL); 
     s_stopping = false;
     pthread_create(&s_inputThreadId, NULL, inputThread, NULL);
@@ -65,6 +72,7 @@ void InputMan_cleanup(void) {
     s_stopping = true;
     pthread_join(s_inputThreadId, NULL);
     
+    // Cleanup hardware drivers
     Rotary_cleanup();
     Accelerometer_cleanup();
     Joystick_cleanup();
@@ -72,30 +80,33 @@ void InputMan_cleanup(void) {
     mpc3208_cleanup(); 
 }
 
+// Called by UDP/Web handlers when they change the volume.
+// This sets a timer that temporarily disables the joystick to prevent fighting.
 void InputMan_notifyManualVolumeSet(void) {
     pthread_mutex_lock(&s_mutex);
     s_lastManualVolumeSet = time(NULL);
-    s_joystickDebounceCounter = JOYSTICK_DEBOUNCE_POLLS; 
+    s_joystickDebounceCounter = JOYSTICK_DEBOUNCE_CYCLES; 
     pthread_mutex_unlock(&s_mutex);
 }
 
-// --- Private Thread Helpers ---
+// --- Internal Logic ---
 
+// Prints the dashboard string required by the assignment:
+// "MO <Mode> <BPM>bpm vol:<Vol> Audio [...] Accel [...]"
 static void printStats(void) {
     double minAudio, maxAudio, avgAudio;
     int countAudio;
     double minAccel, maxAccel, avgAccel;
     int countAccel;
     
-    // Beat Mode, Tempo, Volume
     BeatMode mode = BeatGenerator_getMode();
     int tempo = BeatGenerator_getTempo();
     int volume = AudioMixer_getVolume();
     
-    // Print required status line prefix
+    // Basic status info
     printf("MO %d %dbpm vol:%d ", (int)mode, tempo, volume);
     
-    // Audio Buffer Refill Stats
+    // Audio timing stats (jitter analysis)
     if (Interval_getStats(INTERVAL_AUDIO, &minAudio, &maxAudio, &avgAudio, &countAudio)) {
         printf("Audio [%.3f, %.3f] avg %.3f/%d ", minAudio, maxAudio, avgAudio, countAudio);
         Interval_reset(INTERVAL_AUDIO);
@@ -103,7 +114,7 @@ static void printStats(void) {
         printf("Audio [N/A, N/A] avg N/A/0 ");
     }
     
-    // Accelerometer Poll Stats
+    // Accelerometer polling stats
     if (Interval_getStats(INTERVAL_ACCEL, &minAccel, &maxAccel, &avgAccel, &countAccel)) {
         printf("Accel [%.3f, %.3f] avg %.3f/%d", minAccel, maxAccel, avgAccel, countAccel);
         Interval_reset(INTERVAL_ACCEL);
@@ -114,41 +125,45 @@ static void printStats(void) {
     printf("\n");
 }
 
-
 static void handleJoystick(void) {
+    // Read the GPIO direction (abstracted by Joystick module)
     int direction = Joystick_readVolumeDirection();
     int current_volume;
 
-    // Check if manual volume debounce lockout is active
+    // Check if we are in the lockout period (after a web interface change)
     bool allowJoystick = true;
     pthread_mutex_lock(&s_mutex);
     time_t currentTime = time(NULL);
-    if (currentTime - s_lastManualVolumeSet < DEBOUNCE_SECS) {
+    if (currentTime - s_lastManualVolumeSet < LOCKOUT_DURATION_SEC) {
         allowJoystick = false; 
-        s_joystickDebounceCounter = JOYSTICK_DEBOUNCE_POLLS; 
+        s_joystickDebounceCounter = JOYSTICK_DEBOUNCE_CYCLES; // Keep resetting debounce
     }
     pthread_mutex_unlock(&s_mutex);
 
     if (allowJoystick) {
         if (s_joystickDebounceCounter > 0) {
+            // Waiting for debounce cooldown
             s_joystickDebounceCounter--;
         } else if (direction != 0) {
+            // Valid press detected
             
             current_volume = AudioMixer_getVolume(); 
-            current_volume += direction * VOLUME_STEP;
+            current_volume += direction * VOLUME_INCREMENT;
 
+            // Clamp bounds
             if (current_volume < 0) current_volume = 0; 
             if (current_volume > 100) current_volume = 100;
 
             AudioMixer_setVolume(current_volume);
             
-            s_joystickDebounceCounter = JOYSTICK_DEBOUNCE_POLLS; 
+            // Reset debounce timer to prevent rapid-fire changes
+            s_joystickDebounceCounter = JOYSTICK_DEBOUNCE_CYCLES; 
         }
     }
 }
 
 
-// --- Main Input Thread ---
+// --- Main Polling Thread ---
 
 static void* inputThread(void* _arg) {
     (void)_arg;
@@ -157,29 +172,18 @@ static void* inputThread(void* _arg) {
 
     while (!s_stopping) {
         
-        // 1. Poll Accelerometer for Air-Drumming
+        // 1. Poll Hardware
         Accelerometer_poll(); 
-
-        // 2. Handle Joystick Volume Control
         handleJoystick();
 
-        // 3. Statistics Printing (Once per second)
+        // 2. Output Statistics (Once per second)
         if (time(NULL) != lastPrintTime) {
             printStats();
             lastPrintTime = time(NULL);
         }
 
-<<<<<<< HEAD
-=======
-        // DEBUG : print Accelerometer ADC values 
-            // int x = mpc3208_read_channel(ACCEL_X_CHANNEL);
-            // int y = mpc3208_read_channel(ACCEL_Y_CHANNEL);
-            // int z = mpc3208_read_channel(ACCEL_Z_CHANNEL);
-            // printf("x:%d y:%d z:%d", x,y,z);
-
->>>>>>> new_feature_branch
-        // 4. Sleep/Poll Delay
-        usleep(POLL_PERIOD_MS * 1000); 
+        // 3. Sleep for sample period (10ms)
+        usleep(POLL_RATE_MS * 1000); 
     }
     return NULL;
 }

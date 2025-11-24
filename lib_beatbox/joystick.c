@@ -1,29 +1,46 @@
+/*
+ * Joystick Module
+ * * Handles reading the analog joystick via the ADC.
+ * It provides a simple abstraction to interpret the analog voltage
+ * as discrete "Up", "Down", or "Center" events for volume control.
+ */
+
 #include "joystick.h"
-#include "mpc3208.h" // Uses the real MPC3208 driver
+#include "mpc3208.h" // Uses the shared ADC driver
 #include <stdio.h>
 #include <stdlib.h>
 
-// Joystick vertical axis on ADC channel 1
-#define JOY_ADC_CHANNEL 1 
+// --- Configuration Constants ---
 
-// Thresholds for 12-bit ADC (0-4095)
-#define THRESHOLD_UP   3500 // Pushed up (high voltage)
-#define THRESHOLD_DOWN 500  // Pushed down (low voltage)
+// Which ADC channel the Joystick Y-axis (vertical) is connected to
+#define JOYSTICK_ADC_CHANNEL 1 
+
+// Voltage Thresholds (for 12-bit ADC: 0 to 4095)
+// Up = Voltage approaching VCC (high value)
+// Down = Voltage approaching GND (low value)
+#define THRESHOLD_UP   3500 
+#define THRESHOLD_DOWN 500  
+
+// --- Public API ---
 
 void Joystick_init(void) {
-    // Initialization handled by MPC3208_init in InputMan
+    // The hardware initialization is shared via mpc3208_init(),
+    // so we don't need to do anything specific here.
 }
 
 void Joystick_cleanup(void) {
+    // No specific cleanup needed
 }
 
 int Joystick_readVolumeDirection(void) {
-    int val = mpc3208_read_channel(JOY_ADC_CHANNEL);
+    // Read raw voltage value
+    int val = mpc3208_read_channel(JOYSTICK_ADC_CHANNEL);
     
-    if (val == -1) return 0; // Error
+    if (val == -1) return 0; // Hardware error check
 
-    if (val < THRESHOLD_DOWN) return -1; // Down (Decrease Volume)
-    if (val > THRESHOLD_UP)   return  1; // Up (Increase Volume)
+    // Interpret direction
+    if (val < THRESHOLD_DOWN) return -1; // Stick pushed DOWN (Decrease Volume)
+    if (val > THRESHOLD_UP)   return  1; // Stick pushed UP (Increase Volume)
     
-    return 0; // Center
+    return 0; // Stick is Centered (Deadzone)
 }

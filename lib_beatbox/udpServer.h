@@ -3,12 +3,15 @@
 
 #include "audioMixer.h"
 
-// The UDP port must match the one used by beatbox_server.js (12345)
-
+// Initializes the UDP listening thread.
+// Takes pointers to the sounds so the "play" command can trigger them.
 void UdpServer_init(wavedata_t* pBase, wavedata_t* pSnare, wavedata_t* pHiHat);
+
+// Stops the thread and closes the socket.
 void UdpServer_cleanup(void);
 
-// Returns true (1) if the stop command has been received
+// Returns 1 if a "stop" command has been received, 0 otherwise.
+// Used by the main loop to decide when to exit.
 int UdpServer_shouldQuit(void);
 
 #endif

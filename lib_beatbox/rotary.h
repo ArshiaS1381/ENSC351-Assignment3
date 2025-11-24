@@ -1,10 +1,11 @@
 #ifndef ROTARY_H
 #define ROTARY_H
 
-// Initializes the GPIO thread to monitor the momentary switch for mode cycling
+// Initializes the GPIO monitoring thread.
+// Uses libgpiod to watch the rotary encoder lines.
 void Rotary_init(void);
 
-// Cleans up the GPIO resources and joins the thread
+// Signals the thread to stop and cleans up GPIO resources.
 void Rotary_cleanup(void);
 
 #endif

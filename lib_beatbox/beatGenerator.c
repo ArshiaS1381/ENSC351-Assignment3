@@ -1,3 +1,11 @@
+/*
+ * Beat Generator Module
+ * * This module runs a background thread that acts as the "drummer".
+ * It handles the timing (BPM) and sequencing of the drum patterns.
+ * It sleeps for the duration of a half-beat, wakes up, plays the 
+ * sounds for the current step, and repeats.
+ */
+
 #include "beatGenerator.h"
 #include "audioMixer.h"
 #include <stdio.h>
@@ -7,23 +15,32 @@
 #include <unistd.h>
 #include <time.h>
 
-// --- Internal (static) variables ---
+// --- Configuration Constants ---
+
+#define BPM_DEFAULT 120
+#define BPM_MIN 40      // Slowest allowed tempo
+#define BPM_MAX 300     // Fastest allowed tempo
+
+// --- Internal State ---
+
 static pthread_t s_beatThreadId;
 static volatile bool s_stopping = false;
 static pthread_mutex_t s_mutex = PTHREAD_MUTEX_INITIALIZER;
-static int s_tempo = 120; // Default 120 BPM
+
+// Beat parameters (protected by mutex)
+static int s_tempo = BPM_DEFAULT; 
 static BeatMode s_mode = BEAT_ROCK; 
-static int s_beatCount = 0; 
+static int s_beatCount = 0; // Tracks the current step in the measure (0-7 for 8th notes)
 
 static wavedata_t* s_pBaseSound = NULL;
 static wavedata_t* s_pSnareSound = NULL;
 static wavedata_t* s_pHiHatSound = NULL;
 
-// --- Private function prototypes ---
+// --- Private helper prototypes ---
 static void* playbackThread(void* _arg);
 static long long getNsPerHalfBeat(void);
 
-// --- Public function definitions ---
+// --- Public API ---
 
 void BeatGenerator_init(wavedata_t* pBaseSound, wavedata_t* pSnareSound, wavedata_t* pHiHatSound)
 {
@@ -46,8 +63,9 @@ void BeatGenerator_setTempo(int newTempo)
 {
     pthread_mutex_lock(&s_mutex);
     {
-        if (newTempo < 40) newTempo = 40;
-        if (newTempo > 300) newTempo = 300;
+        // Clamp the tempo to safe limits
+        if (newTempo < BPM_MIN) newTempo = BPM_MIN;
+        if (newTempo > BPM_MAX) newTempo = BPM_MAX;
         s_tempo = newTempo;
     }
     pthread_mutex_unlock(&s_mutex);
@@ -69,7 +87,9 @@ void BeatGenerator_setMode(BeatMode newMode)
     pthread_mutex_lock(&s_mutex);
     {
         s_mode = newMode;
-        s_beatCount = 0; // Reset beat count on mode change
+        // Reset count so the new beat starts from the beginning (step 0)
+        // This prevents feeling "lost" in the measure when switching styles.
+        s_beatCount = 0; 
     }
     pthread_mutex_unlock(&s_mutex);
 }
@@ -85,9 +105,10 @@ BeatMode BeatGenerator_getMode(void)
     return mode;
 }
 
-// --- Private function definitions ---
+// --- Private Implementation ---
 
-// Calculates sleep time using: Time For Half Beat [sec] = 60[sec/min] / BPM / 2
+// Calculate the sleep duration for a half-beat (8th note) in nanoseconds.
+// Formula: Time (sec) = (60 sec / BPM) / 2
 static long long getNsPerHalfBeat(void)
 {
     int tempo = BeatGenerator_getTempo();
@@ -103,38 +124,53 @@ static void* playbackThread(void* _arg)
     while (!s_stopping)
     {
         BeatMode currentMode = BeatGenerator_getMode();
-        int beat = s_beatCount % 8; // Counter 0-7 (8 half-beats for a 4-beat measure)
+        
+        // We use an 8-step sequencer (1 measure of 8th notes)
+        // 0 = Beat 1
+        // 1 = Beat 1.5 (&)
+        // 2 = Beat 2
+        // ...
+        int beat = s_beatCount % 8; 
 
         if (currentMode == BEAT_ROCK) {
-            // Standard rock beat pattern
-            if (beat == 0 || beat == 4) { // 1 or 3 (Base + Hi-Hat)
+            // --- Standard Rock Beat ---
+            // On 1 and 3: Base Drum + Hi-Hat
+            if (beat == 0 || beat == 4) { 
                 AudioMixer_queueSound(s_pHiHatSound);
                 AudioMixer_queueSound(s_pBaseSound);
-            } else if (beat == 2 || beat == 6) { // 2 or 4 (Snare + Hi-Hat)
+            } 
+            // On 2 and 4: Snare + Hi-Hat
+            else if (beat == 2 || beat == 6) { 
                 AudioMixer_queueSound(s_pHiHatSound);
                 AudioMixer_queueSound(s_pSnareSound);
-            } else if (beat == 1 || beat == 3 || beat == 5 || beat == 7) { // Half beats (Hi-Hat only)
+            } 
+            // On all "and" beats (1.5, 2.5...): Hi-Hat only
+            else if (beat % 2 != 0) { 
                 AudioMixer_queueSound(s_pHiHatSound);
             }
         
         } else if (currentMode == BEAT_CUSTOM) {
-            // Rock #2 / Custom Beat: Half-time feel
-            // Hi-hat on every half beat. Base on 1, Snare on 3
+            // --- Custom Half-Time Feel ---
+            // Hi-hat keeps time on every 8th note
             AudioMixer_queueSound(s_pHiHatSound);
-            if (beat == 0) { // Beat 1
+            
+            // Base on 1 only
+            if (beat == 0) { 
                 AudioMixer_queueSound(s_pBaseSound);
             }
-            if (beat == 4) { // Beat 3
+            // Snare on 3 only (Beat 3 is index 4 in 0-7 counting)
+            if (beat == 4) { 
                 AudioMixer_queueSound(s_pSnareSound);
             }
         }
-        // BEAT_NONE does nothing
+        // If BEAT_NONE, we just sleep without queuing sounds.
 
+        // Advance to the next step in the measure
         pthread_mutex_lock(&s_mutex);
         s_beatCount++;
         pthread_mutex_unlock(&s_mutex);
 
-        // Sleep for one half-beat
+        // Wait for the duration of one 8th note
         struct timespec req = {0};
         req.tv_nsec = getNsPerHalfBeat();
         nanosleep(&req, NULL);

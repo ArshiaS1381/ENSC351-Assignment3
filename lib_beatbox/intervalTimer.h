@@ -1,22 +1,26 @@
 #ifndef INTERVALTIMER_H
 #define INTERVALTIMER_H
 
+// Supported interval types to track
 typedef enum {
-    INTERVAL_AUDIO,
-    INTERVAL_ACCEL,
-    NUM_INTERVALS // Must be last
+    INTERVAL_AUDIO, // Time between audio buffer refills
+    INTERVAL_ACCEL, // Time between accelerometer polls
+    NUM_INTERVALS   // Total count (Keep at end)
 } IntervalType;
 
 void Interval_init(void);
 void Interval_cleanup(void);
 
-// Reset stats for a given interval type
+// Resets the statistics for a specific interval type.
+// Typically called after printing stats to start a fresh second.
 void Interval_reset(IntervalType type);
 
-// Mark the current time for a given interval type
+// Call this function every time the event happens.
+// It tracks the time difference between this call and the previous one.
 void Interval_mark(IntervalType type);
 
-// Get statistics. Returns 0 if count is 0, 1 otherwise.
+// Retrieves the current statistics.
+// Returns 1 if data is available, 0 if no samples have been collected.
 int Interval_getStats(IntervalType type, double* min, double* max, double* avg, int* count);
 
 #endif

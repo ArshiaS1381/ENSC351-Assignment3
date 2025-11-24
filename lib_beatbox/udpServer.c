@@ -1,3 +1,13 @@
+/*
+ * UDP Server Module
+ * * This module implements a simple UDP server to allow external control of the BeatBox.
+ * It runs in its own thread and listens for text-based commands (volume, tempo, mode, play).
+ * It parses these commands and calls the appropriate functions in other modules.
+ * * It supports both "Getter" and "Setter" styles:
+ * - "volume"      -> Returns current volume
+ * - "volume 50"   -> Sets volume to 50 and returns new value
+ */
+
 #include "udpServer.h"
 #include "beatGenerator.h" 
 #include "audioMixer.h"  
@@ -11,89 +21,52 @@
 #include <sys/socket.h>
 #include <stdbool.h>
 
-#define PORT 12345
-#define MAX_LINE 1024
+// --- Configuration Constants ---
+
+#define UDP_PORT 12345        // Port to listen on (must match Node.js server)
+#define RX_BUFFER_SIZE 1024   // Max size of a single UDP packet
+
+// --- Internal State ---
 
 static pthread_t s_threadId;
 static int s_socketFd = -1;
 static volatile bool s_wantQuit = false;
 
+// Pointers to the sound data for the "play" command
 static wavedata_t* s_pBaseSound = NULL;
 static wavedata_t* s_pSnareSound = NULL;
 static wavedata_t* s_pHiHatSound = NULL;
 
+// --- Private Helpers ---
+
+// Helper to send a string response back to the sender
 static void send_reply(const char *s, struct sockaddr_in *cli, socklen_t clen) {
     if (s_socketFd != -1) {
         sendto(s_socketFd, s, strlen(s), 0, (struct sockaddr*)cli, clen);
     }
 }
 
+// Command Parser
+// Decodes the text command and executes the corresponding action.
 static void handle_command(char* cmd, struct sockaddr_in *cli, socklen_t clen) {
-    char reply[MAX_LINE] = "";
+    char reply[RX_BUFFER_SIZE] = "";
     
-<<<<<<< HEAD
-    // --- VOLUME (GET: "volume undefined", SET: "volume 80") ---
+    // --- VOLUME Command ---
     if (strncmp(cmd, "volume", 6) == 0) {
         int newVol;
-        if (strstr(cmd, "undefined") != NULL) {
-            // GET request
-            sprintf(reply, "%d", AudioMixer_getVolume());
-        } 
-        else if (sscanf(cmd, "volume %d", &newVol) == 1) {
-            // SET request
-            AudioMixer_setVolume(newVol);
-            InputMan_notifyManualVolumeSet(); // CRITICAL: Stop Accel/Joystick override
-            sprintf(reply, "%d", AudioMixer_getVolume());
-        }
-    }
-    // --- TEMPO (GET: "tempo undefined", SET: "tempo 100") ---
-    else if (strncmp(cmd, "tempo", 5) == 0) {
-        int newTempo;
-        if (strstr(cmd, "undefined") != NULL) {
-            // GET request
-            sprintf(reply, "%d", BeatGenerator_getTempo());
-        }
-        else if (sscanf(cmd, "tempo %d", &newTempo) == 1) {
-            // SET request
-            BeatGenerator_setTempo(newTempo);
-            sprintf(reply, "%d", BeatGenerator_getTempo());
-        }
-    }
-    // --- MODE (GET: "mode undefined", SET: "mode 2") ---
-    else if (strncmp(cmd, "mode", 4) == 0) {
-        int newMode;
-        if (strstr(cmd, "undefined") != NULL) {
-            // GET request
-            sprintf(reply, "%d", BeatGenerator_getMode());
-        }
-        else if (sscanf(cmd, "mode %d", &newMode) == 1) {
-            // SET request
-            BeatGenerator_setMode((BeatMode)newMode);
-            sprintf(reply, "%d", newMode);
-        }
-    }
-    // --- PLAY (SET: "play 1") ---
-    else if (strncmp(cmd, "play", 4) == 0) {
-        int soundId;
-        if (sscanf(cmd, "play %d", &soundId) == 1) {
-            // play 0=base, 1=hi-hat, 2=snare (based on beatbox_ui.js)
-            switch(soundId) {
-=======
-    // --- VOLUME ---
-    if (strncmp(cmd, "volume", 6) == 0) {
-        int newVol;
-        // Attempt to parse a value. If successful (returns 1), it's a SET.
+        // Try to read an integer argument. If successful (ret == 1), it's a SET command.
         if (sscanf(cmd, "volume %d", &newVol) == 1) {
             AudioMixer_setVolume(newVol);
-            InputMan_notifyManualVolumeSet();
+            // Notify InputMan to lock out the joystick temporarily so it doesn't fight us.
+            InputMan_notifyManualVolumeSet(); 
             sprintf(reply, "%d", AudioMixer_getVolume());
         } 
-        // If sscanf fails, treat it as a GET (regardless of "undefined" string)
+        // If no argument found, treat as a GET command.
         else {
             sprintf(reply, "%d", AudioMixer_getVolume());
         }
     }
-    // --- TEMPO ---
+    // --- TEMPO Command ---
     else if (strncmp(cmd, "tempo", 5) == 0) {
         int newTempo;
         if (sscanf(cmd, "tempo %d", &newTempo) == 1) {
@@ -104,7 +77,7 @@ static void handle_command(char* cmd, struct sockaddr_in *cli, socklen_t clen) {
             sprintf(reply, "%d", BeatGenerator_getTempo());
         }
     }
-    // --- MODE ---
+    // --- MODE Command ---
     else if (strncmp(cmd, "mode", 4) == 0) {
         int newMode;
         if (sscanf(cmd, "mode %d", &newMode) == 1) {
@@ -115,27 +88,21 @@ static void handle_command(char* cmd, struct sockaddr_in *cli, socklen_t clen) {
             sprintf(reply, "%d", BeatGenerator_getMode());
         }
     }
-    // --- PLAY ---
+    // --- PLAY Command ---
+    // Allows the web interface to trigger individual drum sounds
     else if (strncmp(cmd, "play", 4) == 0) {
-        // ... (Keep your existing play logic) ...
         int soundId;
         if (sscanf(cmd, "play %d", &soundId) == 1) {
              switch(soundId) {
->>>>>>> new_feature_branch
                 case 0: AudioMixer_queueSound(s_pBaseSound); break;
                 case 1: AudioMixer_queueSound(s_pHiHatSound); break;
                 case 2: AudioMixer_queueSound(s_pSnareSound); break;
             }
         }
-<<<<<<< HEAD
-        sprintf(reply, "1"); 
+        sprintf(reply, "1"); // Acknowledge
     }
-    // --- STOP (SET: "stop") ---
-=======
-        sprintf(reply, "1");
-    }
-    // --- STOP ---
->>>>>>> new_feature_branch
+    // --- STOP Command ---
+    // Terminates the main application loop
     else if (strncmp(cmd, "stop", 4) == 0) {
         s_wantQuit = true;
         sprintf(reply, "Stopping");
@@ -147,20 +114,23 @@ static void handle_command(char* cmd, struct sockaddr_in *cli, socklen_t clen) {
     send_reply(reply, cli, clen);
 }
 
+// --- Main UDP Thread ---
+
 static void* udpListenerThread(void *arg) {
     (void)arg;
     
-    // Set up socket and binding
+    // 1. Create Socket
     if ((s_socketFd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
         perror("UDP: socket failed");
         return NULL;
     }
 
+    // 2. Bind to Port
     struct sockaddr_in servaddr;
     memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family    = AF_INET;
-    servaddr.sin_addr.s_addr = INADDR_ANY;
-    servaddr.sin_port = htons(PORT);
+    servaddr.sin_addr.s_addr = INADDR_ANY; // Listen on all interfaces
+    servaddr.sin_port = htons(UDP_PORT);
 
     if (bind(s_socketFd, (const struct sockaddr *)&servaddr, sizeof(servaddr)) < 0) {
         perror("UDP: bind failed");
@@ -169,24 +139,29 @@ static void* udpListenerThread(void *arg) {
         return NULL;
     }
     
-    printf("UDP Server listening on port %d...\n", PORT);
+    printf("UDP Server listening on port %d...\n", UDP_PORT);
 
-    char buf[MAX_LINE];
+    char buf[RX_BUFFER_SIZE];
     struct sockaddr_in clientSin;
     socklen_t clientLen = sizeof(clientSin);
     
+    // 3. Listen Loop
     while (!s_wantQuit) {
-        ssize_t r = recvfrom(s_socketFd, buf, MAX_LINE - 1, 0,
+        // Blocks here until data arrives
+        ssize_t r = recvfrom(s_socketFd, buf, RX_BUFFER_SIZE - 1, 0,
                              (struct sockaddr*)&clientSin, &clientLen);
 
         if (r < 0) {
+            // Check if we were woken up by a shutdown signal
             if (s_wantQuit) break; 
             perror("UDP: Error receiving");
             continue;
         }
 
+        // Null-terminate the received string
         buf[r] = '\0';
-        // Trim newline/carriage returns
+        
+        // Clean up whitespace (newlines) from the end of the command
         while (r > 0 && (buf[r-1] == '\n' || buf[r-1] == '\r')) buf[--r] = '\0';
 
         if (r > 0) {
@@ -199,6 +174,8 @@ static void* udpListenerThread(void *arg) {
     return NULL;
 }
 
+// --- Public API ---
+
 void UdpServer_init(wavedata_t* pBase, wavedata_t* pSnare, wavedata_t* pHiHat) {
     s_pBaseSound = pBase;
     s_pSnareSound = pSnare;
@@ -210,7 +187,7 @@ void UdpServer_init(wavedata_t* pBase, wavedata_t* pSnare, wavedata_t* pHiHat) {
 void UdpServer_cleanup(void) {
     s_wantQuit = true;
     if (s_socketFd != -1) {
-        // Shutdown read end to unblock recvfrom()
+        // Shutdown the socket to force recvfrom() to unblock and return
         shutdown(s_socketFd, SHUT_RD);
     }
     pthread_join(s_threadId, NULL);
